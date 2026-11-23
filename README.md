@@ -67,6 +67,10 @@ The seed creates an admin with mobile `9000000000`. Set `SEED_ADMIN_PASSWORD`
 to choose its password; otherwise the seed prints a temporary one that must be
 changed on first login.
 
+## Deploy
+
+See [DEPLOY.md](DEPLOY.md) (Railway, Docker).
+
 ## Code map
 
 | Path | What |
@@ -82,4 +86,4 @@ changed on first login.
 
 Content inbox with editorial board, members
 import, renewal reminders for last year's advertisers, text flowing onto a continuation
-page, Supabase Storage for uploads, printer pack download.
+page, printer pack download.

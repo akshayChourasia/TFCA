@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requirePermission } from "@/lib/auth";
+import { renderOrigin } from "@/lib/render-token";
 import { loadInvoice } from "@/lib/invoice-data";
 import { renderDocumentPdf } from "@/lib/pdf";
 
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/invoices/[in
   }
   const data = await loadInvoice(org.id, invoiceId);
   if (!data) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
-  const origin = process.env.RENDER_ORIGIN || req.nextUrl.origin;
+  const origin = renderOrigin(req.nextUrl.origin);
   const pdf = await renderDocumentPdf(origin, org.id, `invoice:${invoiceId}`, `/render/invoice/${invoiceId}`);
   const kind = data.invoice.paidAt ? "Receipt" : "Invoice";
   const name = `${kind}-${data.invoice.number.replace(/\//g, "-")}.pdf`;
