@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getCurrentOrg } from "@/lib/org";
+import { requirePermission } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import { loadIssue } from "@/lib/issue-data";
 import { exportIssuePdf, type PdfMode } from "@/lib/pdf";
 
@@ -13,8 +14,14 @@ export const maxDuration = 300;
 export async function GET(req: NextRequest, ctx: RouteContext<"/api/issues/[issueId]/pdf">) {
   const { issueId } = await ctx.params;
   const mode: PdfMode = req.nextUrl.searchParams.get("mode") === "print" ? "print" : "digital";
-  const force = req.nextUrl.searchParams.get("force") === "1";
-  const org = await getCurrentOrg();
+  let user;
+  try {
+    user = await requirePermission("export");
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 403 });
+  }
+  const org = user.org;
+  const force = req.nextUrl.searchParams.get("force") === "1" && can(user.role, "export.override");
   const loaded = await loadIssue(org.id, issueId);
   if (!loaded) return NextResponse.json({ error: "Issue not found" }, { status: 404 });
 

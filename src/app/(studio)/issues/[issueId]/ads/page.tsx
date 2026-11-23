@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { getCurrentOrg } from "@/lib/org";
+import { requireUser } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import { loadIssue } from "@/lib/issue-data";
 import { SLOTS, SLOT_LABELS, inr } from "@/lib/money";
 import { RateCardEditor, NewBookingForm, BookingsTable, type BookingRow } from "@/components/AdsManager";
@@ -11,7 +12,9 @@ export const dynamic = "force-dynamic";
 
 export default async function AdsPage(props: PageProps<"/issues/[issueId]/ads">) {
   const { issueId } = await props.params;
-  const org = await getCurrentOrg();
+  const user = await requireUser();
+  if (!can(user.role, "ads.manage")) return <div className="p-8 text-neutral-600">Only admins and ad managers can see advertisers and invoices.</div>;
+  const org = user.org;
   const loaded = await loadIssue(org.id, issueId);
   if (!loaded) notFound();
   const { issue, pages } = loaded;

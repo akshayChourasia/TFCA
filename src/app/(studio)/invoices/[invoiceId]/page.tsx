@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentOrg } from "@/lib/org";
+import { requireUser } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import { loadInvoice } from "@/lib/invoice-data";
 import { InvoiceDocument } from "@/components/InvoiceDocument";
 import { PaymentForm } from "@/components/PaymentForm";
@@ -10,7 +11,9 @@ export const dynamic = "force-dynamic";
 
 export default async function InvoicePage(props: PageProps<"/invoices/[invoiceId]">) {
   const { invoiceId } = await props.params;
-  const org = await getCurrentOrg();
+  const user = await requireUser();
+  if (!can(user.role, "ads.manage")) return <div className="p-8 text-neutral-600">Only admins and ad managers can see advertisers and invoices.</div>;
+  const org = user.org;
   const data = await loadInvoice(org.id, invoiceId);
   if (!data) notFound();
   const { invoice, advertiser, issue } = data;

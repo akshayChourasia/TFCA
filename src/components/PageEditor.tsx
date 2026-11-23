@@ -18,12 +18,14 @@ export function PageEditor({
   mode,
   boxes: boxes0,
   ctx,
+  perms,
 }: {
   pageId: string;
   initial: { templateKey: string; section: string | null; data: Record<string, unknown>; status: Status };
   mode: "template" | "free";
   boxes: Box[] | null;
   ctx: Omit<RenderContext, "section">;
+  perms: { edit: boolean; approve: boolean; lock: boolean };
 }) {
   const [templateKey, setTemplateKey] = useState(initial.templateKey);
   const [section, setSection] = useState(initial.section ?? "");
@@ -33,7 +35,10 @@ export function PageEditor({
   const [saved, setSaved] = useState(true);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const locked = status === "locked";
+  const locked = status === "locked" || !perms.edit;
+  const statusOptions = STATUSES.filter(
+    (s) => s === initial.status || s === "draft" || s === "proofreading" || (s === "approved" && perms.approve) || (s === "locked" && perms.lock),
+  );
   const [freeMode, setFreeMode] = useState(mode === "free");
   const [boxes, setBoxes] = useState<Box[]>(boxes0 ?? []);
   const [base, setBase] = useState<"template" | "blank">(initial.data.__freeBase === "blank" ? "blank" : "template");
@@ -114,6 +119,7 @@ export function PageEditor({
           <label className="block">
             Status
             <select
+              disabled={!perms.edit}
               value={status}
               onChange={(e) => {
                 setStatus(e.target.value as Status);
@@ -121,7 +127,7 @@ export function PageEditor({
               }}
               className="mt-1 block w-full rounded border px-2 py-1.5"
             >
-              {STATUSES.map((s) => (
+              {statusOptions.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
@@ -247,6 +253,8 @@ export function PageEditor({
           </fieldset>
         )}
 
+        {!perms.edit && <div className="text-sm text-neutral-600">Your role can view this page but not edit it.</div>}
+        {perms.edit && (
         <div className="sticky bottom-0 flex items-center gap-3 bg-[var(--background)] py-3">
           <button
             onClick={save}
@@ -257,6 +265,7 @@ export function PageEditor({
           </button>
           {error && <span className="text-sm text-rose-700">{error}</span>}
         </div>
+        )}
       </div>
 
       {freeMode ? (

@@ -5,17 +5,19 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db, schema } from "@/db";
-import { getCurrentOrg } from "@/lib/org";
+import { requirePermission } from "@/lib/auth";
+import { can, type Permission } from "@/lib/roles";
 import { TEMPLATES, templateByKey } from "@/templates";
 
 const { issues, pages } = schema;
 
 /** Reads a page and checks it belongs to the current organisation. */
-async function ownedPage(pageId: string) {
-  const org = await getCurrentOrg();
+async function ownedPage(pageId: string, permission: Permission) {
+  const user = await requirePermission(permission);
+  const org = user.org;
   const page = await db.query.pages.findFirst({ where: and(eq(pages.id, pageId), eq(pages.orgId, org.id)) });
   if (!page) throw new Error("Page not found");
-  return { org, page };
+  return { org, page, user };
 }
 
 /** Rewrites positions 0..n-1 in the current order. */
@@ -29,7 +31,7 @@ async function renumber(issueId: string) {
 }
 
 export async function createIssue(formData: FormData) {
-  const org = await getCurrentOrg();
+  const org = (await requirePermission("issues.manage")).org;
   const input = z
     .object({ title: z.string().min(1), year: z.coerce.number().int().min(2000).max(2100), editionLabel: z.string().optional() })
     .parse(Object.fromEntries(formData));
@@ -54,7 +56,7 @@ export async function createIssue(formData: FormData) {
 }
 
 export async function addPage(issueId: string, templateKey: string, afterPosition: number | null) {
-  const org = await getCurrentOrg();
+  const org = (await requirePermission("issues.manage")).org;
   if (!TEMPLATES.some((t) => t.key === templateKey)) throw new Error("Unknown template");
   const issue = await db.query.issues.findFirst({ where: and(eq(issues.id, issueId), eq(issues.orgId, org.id)) });
   if (!issue) throw new Error("Issue not found");
@@ -82,7 +84,7 @@ export async function addPage(issueId: string, templateKey: string, afterPositio
 }
 
 export async function movePage(pageId: string, direction: -1 | 1) {
-  const { page } = await ownedPage(pageId);
+  const { page } = await ownedPage(pageId, "issues.manage");
   const neighbour = await db.query.pages.findFirst({
     where: and(eq(pages.issueId, page.issueId), eq(pages.position, page.position + direction)),
   });
@@ -95,7 +97,7 @@ export async function movePage(pageId: string, direction: -1 | 1) {
 }
 
 export async function deletePage(pageId: string) {
-  const { page } = await ownedPage(pageId);
+  const { page } = await ownedPage(pageId, "issues.manage");
   await db.delete(pages).where(eq(pages.id, page.id));
   await renumber(page.issueId);
   revalidatePath(`/issues/${page.issueId}`);
@@ -109,9 +111,25 @@ const saveSchema = z.object({
 });
 
 export async function savePage(pageId: string, input: z.infer<typeof saveSchema>) {
-  const { page } = await ownedPage(pageId);
-  if (page.status === "locked" && input.status === "locked") throw new Error("Page is locked. Unlock it to edit.");
+  const { page, user } = await ownedPage(pageId, "pages.edit");
   const parsed = saveSchema.parse(input);
+  const statusChanged = parsed.status !== page.status;
+  if (statusChanged) {
+    if ((parsed.status === "locked" || page.status === "locked") && !can(user.role, "pages.lock")) {
+      throw new Error("Only the chief editor or an admin can lock or unlock a page.");
+    }
+    if (parsed.status === "approved" && !can(user.role, "pages.approve")) {
+      throw new Error("Your role cannot approve pages. Send it to proofreading instead.");
+    }
+  }
+  if (page.status === "locked") {
+    // A locked page keeps its content; only its status can change (to unlock it).
+    if (!statusChanged) throw new Error("Page is locked. Unlock it to edit.");
+    await db.update(pages).set({ status: parsed.status, updatedAt: new Date() }).where(eq(pages.id, page.id));
+    revalidatePath(`/issues/${page.issueId}`);
+    revalidatePath(`/issues/${page.issueId}/pages/${page.id}`);
+    return;
+  }
   templateByKey(parsed.templateKey); // validates key exists (falls back otherwise)
   await db
     .update(pages)
@@ -151,7 +169,7 @@ const boxSchema = z.object({
 
 /** Switches a page to free drag-and-drop editing. */
 export async function unlockPage(pageId: string, base: "template" | "blank") {
-  const { page } = await ownedPage(pageId);
+  const { page } = await ownedPage(pageId, "pages.edit");
   if (page.status === "locked") throw new Error("Page is locked.");
   await db
     .update(pages)
@@ -163,7 +181,7 @@ export async function unlockPage(pageId: string, base: "template" | "blank") {
 
 /** Back to the plain template: free-mode boxes are removed. */
 export async function resetToTemplate(pageId: string) {
-  const { page } = await ownedPage(pageId);
+  const { page } = await ownedPage(pageId, "pages.edit");
   if (page.status === "locked") throw new Error("Page is locked.");
   const { __freeBase: _ignored, ...data } = page.data;
   void _ignored;
@@ -173,7 +191,7 @@ export async function resetToTemplate(pageId: string) {
 }
 
 export async function saveFreeBoxes(pageId: string, boxes: unknown, base: "template" | "blank") {
-  const { page } = await ownedPage(pageId);
+  const { page } = await ownedPage(pageId, "pages.edit");
   if (page.status === "locked") throw new Error("Page is locked.");
   const parsed = z.array(boxSchema).max(200).parse(boxes);
   await db

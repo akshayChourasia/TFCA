@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentOrg } from "@/lib/org";
+import { requireUser } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import { loadIssue } from "@/lib/issue-data";
 import { PageEditor } from "@/components/PageEditor";
 
@@ -8,7 +9,8 @@ export const dynamic = "force-dynamic";
 
 export default async function EditPage(props: PageProps<"/issues/[issueId]/pages/[pageId]">) {
   const { issueId, pageId } = await props.params;
-  const org = await getCurrentOrg();
+  const user = await requireUser();
+  const org = user.org;
   const loaded = await loadIssue(org.id, issueId);
   const page = loaded?.pages.find((p) => p.id === pageId);
   if (!loaded || !page) notFound();
@@ -32,6 +34,7 @@ export default async function EditPage(props: PageProps<"/issues/[issueId]/pages
         mode={page.mode}
         boxes={page.boxes}
         ctx={{ ...loaded.ctx, pageNumber: page.pageNumber }}
+        perms={{ edit: can(user.role, "pages.edit"), approve: can(user.role, "pages.approve"), lock: can(user.role, "pages.lock") }}
       />
     </div>
   );

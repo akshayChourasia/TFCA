@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentOrg } from "@/lib/org";
+import { requireUser } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import { loadIssue } from "@/lib/issue-data";
 import { PageThumb } from "@/components/PageThumb";
 import { PageActions, AddPageBar } from "@/components/FlatplanControls";
@@ -19,7 +20,8 @@ const STATUS_STYLE: Record<string, string> = {
 
 export default async function FlatplanPage(props: PageProps<"/issues/[issueId]">) {
   const { issueId } = await props.params;
-  const org = await getCurrentOrg();
+  const user = await requireUser();
+  const org = user.org;
   const loaded = await loadIssue(org.id, issueId);
   if (!loaded) notFound();
   const { issue, pages, ctx } = loaded;
@@ -49,18 +51,22 @@ export default async function FlatplanPage(props: PageProps<"/issues/[issueId]">
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <ExportPanel issueId={issue.id} />
+          {can(user.role, "export") && <ExportPanel issueId={issue.id} canOverride={can(user.role, "export.override")} />}
+          {can(user.role, "ads.manage") && (
           <Link href={`/issues/${issue.id}/ads`} className="text-sm font-semibold text-[#1f5fa8] hover:underline">
             Ads & invoices →
           </Link>
+          )}
         </div>
       </div>
 
+      {can(user.role, "issues.manage") && (
       <AddPageBar
         issueId={issue.id}
         templates={TEMPLATES.map((t) => ({ key: t.key, name: t.name }))}
         positions={pages.map((p) => ({ position: p.position, label: `${p.pageNumber}. ${p.title}` }))}
       />
+      )}
 
       <div className="mt-6 flex flex-wrap gap-x-10 gap-y-8">
         {spreads.map((spread, si) => (
@@ -75,7 +81,7 @@ export default async function FlatplanPage(props: PageProps<"/issues/[issueId]">
                   <span className={`rounded px-1.5 py-0.5 ${STATUS_STYLE[p.status]}`}>{p.status}</span>
                 </div>
                 <div className="text-xs text-neutral-700 truncate" title={p.title}>{p.title}</div>
-                <PageActions pageId={p.id} isFirst={p.pageNumber === 1} isLast={p.pageNumber === pages.length} />
+                {can(user.role, "issues.manage") && <PageActions pageId={p.id} isFirst={p.pageNumber === 1} isLast={p.pageNumber === pages.length} />}
               </div>
             ))}
           </div>

@@ -6,6 +6,7 @@
 import { eq } from "drizzle-orm";
 import { db, schema } from "../src/db";
 import { defaultBrand } from "../src/lib/brand";
+import { hashPassword, tempPassword } from "../src/lib/password";
 
 const SAMPLE_STORY = `उनका जन्म एक छोटे से गाँव में हुआ। बचपन से ही काम के प्रति लगाव रहा और हर काम को उन्होंने सीखने का अवसर माना।
 
@@ -46,6 +47,18 @@ async function main() {
       billing: { address: "Treasure Fantasy, Indore, Madhya Pradesh", phone: "9000000001", upiId: "tfca@upi" },
     })
     .returning();
+
+  // First admin. Set SEED_ADMIN_PASSWORD to choose the password; otherwise a
+  // temporary one is generated and must be changed on first login.
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || tempPassword();
+  await db.insert(schema.teamUsers).values({
+    orgId: org.id,
+    name: "Admin",
+    phone: "9000000000",
+    role: "admin",
+    passwordHash: await hashPassword(adminPassword),
+    mustChangePassword: !process.env.SEED_ADMIN_PASSWORD,
+  });
 
   await db.insert(schema.teamUsers).values([
     { orgId: org.id, name: "संपादक एक", phone: "9000000001", role: "chief_editor", creditTitle: "Concept & Vision", creditQuote: "Great ideas become meaningful stories." },
@@ -143,6 +156,7 @@ async function main() {
   ]);
 
   console.log(`Seeded TFCA with issue ${issue.year} (${pageDefs.length} pages).`);
+  console.log(`Admin login: mobile 9000000000, password ${adminPassword}`);
   process.exit(0);
 }
 
