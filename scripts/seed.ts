@@ -38,7 +38,13 @@ async function main() {
 
   const [org] = await db
     .insert(schema.organizations)
-    .values({ slug: "tfca", name: "Treasure Fantasy Cricket Association", shortName: "TFCA", brand: defaultBrand })
+    .values({
+      slug: "tfca",
+      name: "Treasure Fantasy Cricket Association",
+      shortName: "TFCA",
+      brand: defaultBrand,
+      billing: { address: "Treasure Fantasy, Indore, Madhya Pradesh", phone: "9000000001", upiId: "tfca@upi" },
+    })
     .returning();
 
   await db.insert(schema.teamUsers).values([
@@ -114,6 +120,27 @@ async function main() {
       data: p.data,
     })),
   );
+
+  const advs = await db
+    .insert(schema.advertisers)
+    .values([
+      { orgId: org.id, businessName: "Sample Builders", contactName: "Owner", phone: "9000001001", category: "Builder" },
+      { orgId: org.id, businessName: "Sample Nutrition Centre", contactName: "Coach", phone: "9000001002", category: "Health" },
+      { orgId: org.id, businessName: "Sample Brokers", contactName: "Partner", phone: "9000001003", category: "Real estate" },
+    ])
+    .returning();
+  await db.insert(schema.rateCard).values([
+    { orgId: org.id, issueId: issue.id, slot: "back_cover", priceInr: 25000 },
+    { orgId: org.id, issueId: issue.id, slot: "inside_front_cover", priceInr: 15000 },
+    { orgId: org.id, issueId: issue.id, slot: "inside_back_cover", priceInr: 15000 },
+    { orgId: org.id, issueId: issue.id, slot: "full", priceInr: 10000 },
+    { orgId: org.id, issueId: issue.id, slot: "half", priceInr: 6000 },
+    { orgId: org.id, issueId: issue.id, slot: "quarter", priceInr: 3500 },
+  ]);
+  await db.insert(schema.adBookings).values([
+    { orgId: org.id, issueId: issue.id, advertiserId: advs[0].id, slot: "full", priceInr: 10000, status: "confirmed" },
+    { orgId: org.id, issueId: issue.id, advertiserId: advs[1].id, slot: "half", priceInr: 6000, status: "lead" },
+  ]);
 
   console.log(`Seeded TFCA with issue ${issue.year} (${pageDefs.length} pages).`);
   process.exit(0);

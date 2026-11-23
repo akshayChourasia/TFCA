@@ -223,3 +223,24 @@ export async function exportIssuePdf(opts: {
     await rm(dir, { recursive: true, force: true });
   }
 }
+
+/** Prints a single internal page (e.g. an invoice) to an A4 PDF. */
+export async function renderDocumentPdf(origin: string, orgId: string, resource: string, pathName: string) {
+  const token = signRender(orgId, resource);
+  const browser = await chromium.launch({
+    executablePath: process.env.CHROMIUM_PATH || undefined,
+    args: ["--no-sandbox", "--font-render-hinting=none"],
+  });
+  try {
+    const page = await browser.newPage();
+    const res = await page.goto(`${origin}${pathName}?token=${encodeURIComponent(token)}`, {
+      waitUntil: "networkidle",
+      timeout: 60_000,
+    });
+    if (!res || !res.ok()) throw new Error(`Render page failed: ${res?.status()}`);
+    await page.evaluate(() => document.fonts.ready);
+    return Buffer.from(await page.pdf({ format: "A4", printBackground: true, preferCSSPageSize: true }));
+  } finally {
+    await browser.close();
+  }
+}

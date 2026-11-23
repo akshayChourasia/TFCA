@@ -26,6 +26,11 @@ belongs to an organisation).
   - *Preflight* blocks export on missing images, images under 300 dpi
     (print), text overflow and page count; unapproved pages are warnings.
     Admins can override.
+- **Advertiser CRM** – advertiser directory with billed and due totals; rate
+  card per issue; bookings with status, price, artwork upload and placement on
+  an ad page (the page updates with the artwork); invoices numbered
+  `TFCA/2027/001` as A4 PDFs; payment stays offline and is recorded (cash, UPI,
+  cheque, bank) which turns the invoice into a receipt; WhatsApp message link.
 - **Brand kit per township** – masthead lines, colours and fonts.
 
 ## Stack
@@ -59,7 +64,6 @@ npm run dev                     # http://localhost:3000
 
 ## Next up
 
-Phone-OTP login and roles, content inbox with editorial board, advertisers
-(bookings, invoices and receipts with offline payment recording), members
-import, free-form page mode (drag and drop), text flowing onto a continuation
+Phone-OTP login and roles, content inbox with editorial board, members
+import, renewal reminders for last year's advertisers, free-form page mode (drag and drop), text flowing onto a continuation
 page, Supabase Storage for uploads, printer pack download.

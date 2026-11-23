@@ -48,7 +48,12 @@ export default async function FlatplanPage(props: PageProps<"/issues/[issueId]">
             )}
           </p>
         </div>
-        <ExportPanel issueId={issue.id} />
+        <div className="flex flex-col items-end gap-2">
+          <ExportPanel issueId={issue.id} />
+          <Link href={`/issues/${issue.id}/ads`} className="text-sm font-semibold text-[#1f5fa8] hover:underline">
+            Ads & invoices →
+          </Link>
+        </div>
       </div>
 
       <AddPageBar
