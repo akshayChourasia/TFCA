@@ -4,7 +4,7 @@ import { and, eq, like, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db, schema } from "@/db";
-import { getCurrentOrg } from "@/lib/org";
+import { requirePermission } from "@/lib/auth";
 import { PAYMENT_METHODS, SLOTS } from "@/lib/money";
 
 const { advertisers, adBookings, rateCard, invoices, issues, pages } = schema;
@@ -13,14 +13,14 @@ const slotSchema = z.enum(SLOTS as [string, ...string[]]);
 const statusSchema = z.enum(["lead", "contacted", "confirmed", "artwork_received", "artwork_approved", "paid", "cancelled"]);
 
 async function ownedIssue(issueId: string) {
-  const org = await getCurrentOrg();
+  const org = (await requirePermission("ads.manage")).org;
   const issue = await db.query.issues.findFirst({ where: and(eq(issues.id, issueId), eq(issues.orgId, org.id)) });
   if (!issue) throw new Error("Issue not found");
   return { org, issue };
 }
 
 async function ownedBooking(bookingId: string) {
-  const org = await getCurrentOrg();
+  const org = (await requirePermission("ads.manage")).org;
   const booking = await db.query.adBookings.findFirst({
     where: and(eq(adBookings.id, bookingId), eq(adBookings.orgId, org.id)),
   });
@@ -46,7 +46,7 @@ const advertiserSchema = z.object({
 });
 
 export async function saveAdvertiser(id: string | null, formData: FormData) {
-  const org = await getCurrentOrg();
+  const org = (await requirePermission("ads.manage")).org;
   const v = advertiserSchema.parse(Object.fromEntries(formData));
   const values = {
     businessName: v.businessName,
@@ -207,7 +207,7 @@ export async function issueInvoice(bookingId: string) {
 }
 
 export async function recordPayment(invoiceId: string, input: { method: string; ref: string; date: string }) {
-  const org = await getCurrentOrg();
+  const org = (await requirePermission("ads.manage")).org;
   const inv = await db.query.invoices.findFirst({ where: and(eq(invoices.id, invoiceId), eq(invoices.orgId, org.id)) });
   if (!inv) throw new Error("Invoice not found");
   const method = z.enum(PAYMENT_METHODS).parse(input.method);
@@ -225,7 +225,7 @@ export async function recordPayment(invoiceId: string, input: { method: string; 
 }
 
 export async function undoPayment(invoiceId: string) {
-  const org = await getCurrentOrg();
+  const org = (await requirePermission("ads.manage")).org;
   const inv = await db.query.invoices.findFirst({ where: and(eq(invoices.id, invoiceId), eq(invoices.orgId, org.id)) });
   if (!inv) throw new Error("Invoice not found");
   await db.update(invoices).set({ paidAt: null, paymentMethod: null, paymentRef: null }).where(eq(invoices.id, inv.id));

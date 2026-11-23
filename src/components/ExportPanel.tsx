@@ -5,7 +5,7 @@ import { useState } from "react";
 type Issue = { level: "error" | "warning"; page: number | null; message: string };
 
 /** Print / digital PDF export with the preflight report. */
-export function ExportPanel({ issueId }: { issueId: string }) {
+export function ExportPanel({ issueId, canOverride }: { issueId: string; canOverride: boolean }) {
   const [busy, setBusy] = useState<null | "print" | "digital">(null);
   const [report, setReport] = useState<{ mode: string; items: Issue[]; blocked: boolean } | null>(null);
 
@@ -67,7 +67,7 @@ export function ExportPanel({ issueId }: { issueId: string }) {
               </li>
             ))}
           </ul>
-          {report.blocked && (
+          {report.blocked && canOverride && (
             <button className="mt-2 text-xs underline text-neutral-600" onClick={() => run(report.mode as "print" | "digital", true)}>
               Export anyway (admin override)
             </button>

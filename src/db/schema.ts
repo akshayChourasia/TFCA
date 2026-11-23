@@ -108,9 +108,26 @@ export const teamUsers = pgTable(
     creditTitle: text("credit_title"),
     creditQuote: text("credit_quote"),
     photoUrl: text("photo_url"),
+    /** scrypt hash; null = cannot log in yet (credits-only entry). */
+    passwordHash: text("password_hash"),
+    mustChangePassword: boolean("must_change_password").notNull().default(true),
+    active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("team_users_org_phone").on(t.orgId, t.phone)],
+);
+
+/** Login sessions. Only a SHA-256 of the cookie token is stored. */
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    userId: uuid("user_id").notNull().references(() => teamUsers.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("sessions_user").on(t.userId)],
 );
 
 /** Residents: feeds the telephone directory and resident profiles. */

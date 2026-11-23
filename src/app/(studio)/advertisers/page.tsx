@@ -1,30 +1,47 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, count, eq, ne, sql, sum } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { getCurrentOrg } from "@/lib/org";
+import { requireUser } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import { inr } from "@/lib/money";
 import { AdvertiserForm } from "@/components/AdvertiserForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdvertisersPage() {
-  const org = await getCurrentOrg();
+  const user = await requireUser();
+  if (!can(user.role, "ads.manage")) return <div className="p-8 text-neutral-600">Only admins and ad managers can see advertisers and invoices.</div>;
+  const org = user.org;
   const { advertisers, adBookings, invoices } = schema;
-  const rows = await db
-    .select({
-      id: advertisers.id,
-      businessName: advertisers.businessName,
-      contactName: advertisers.contactName,
-      phone: advertisers.phone,
-      category: advertisers.category,
-      address: advertisers.address,
-      gstin: advertisers.gstin,
-      bookings: sql<number>`(select count(*) from ${adBookings} where ${adBookings.advertiserId} = ${advertisers.id} and ${adBookings.status} <> 'cancelled')`,
-      billed: sql<number>`coalesce((select sum(${invoices.amountInr}) from ${invoices} join ${adBookings} on ${adBookings.id} = ${invoices.bookingId} where ${adBookings.advertiserId} = ${advertisers.id}), 0)`,
-      due: sql<number>`coalesce((select sum(${invoices.amountInr}) from ${invoices} join ${adBookings} on ${adBookings.id} = ${invoices.bookingId} where ${adBookings.advertiserId} = ${advertisers.id} and ${invoices.paidAt} is null), 0)`,
-    })
+  const list = await db
+    .select()
     .from(advertisers)
     .where(eq(advertisers.orgId, org.id))
     .orderBy(asc(advertisers.businessName));
+  // Totals per advertiser (bookings that aren't cancelled; billed and unpaid invoice amounts).
+  const bookingCounts = await db
+    .select({ advertiserId: adBookings.advertiserId, n: count() })
+    .from(adBookings)
+    .where(and(eq(adBookings.orgId, org.id), ne(adBookings.status, "cancelled")))
+    .groupBy(adBookings.advertiserId);
+  const money = await db
+    .select({
+      advertiserId: adBookings.advertiserId,
+      billed: sum(invoices.amountInr),
+      due: sql<string>`coalesce(sum(${invoices.amountInr}) filter (where ${invoices.paidAt} is null), 0)`,
+    })
+    .from(invoices)
+    .innerJoin(adBookings, eq(adBookings.id, invoices.bookingId))
+    .where(eq(invoices.orgId, org.id))
+    .groupBy(adBookings.advertiserId);
+  const rows = list.map((a) => {
+    const m = money.find((x) => x.advertiserId === a.id);
+    return {
+      ...a,
+      bookings: bookingCounts.find((x) => x.advertiserId === a.id)?.n ?? 0,
+      billed: Number(m?.billed ?? 0),
+      due: Number(m?.due ?? 0),
+    };
+  });
 
   return (
     <div className="p-8 max-w-5xl">

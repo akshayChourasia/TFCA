@@ -36,6 +36,13 @@ belongs to an organisation).
   `TFCA/2027/001` as A4 PDFs; payment stays offline and is recorded (cash, UPI,
   cheque, bank) which turns the invoice into a receipt; WhatsApp message link.
 - **Brand kit per township** – masthead lines, colours and fonts.
+- **Login and roles** – mobile number + password. Admins add team members on
+  *Team & logins*; each gets a temporary password (with a WhatsApp link to
+  send it) and sets their own on first login. Admins can reset passwords,
+  change roles and deactivate logins, and the last active admin is protected.
+  Roles: admin, chief editor, editor, proofreader, designer, ad manager,
+  viewer (see `src/lib/roles.ts`). Sessions last 30 days; 5 wrong passwords
+  lock that number for 15 minutes.
 
 ## Stack
 
@@ -56,6 +63,10 @@ npm run db:seed                 # TFCA + sample 2027 issue (sample data only)
 npm run dev                     # http://localhost:3000
 ```
 
+The seed creates an admin with mobile `9000000000`. Set `SEED_ADMIN_PASSWORD`
+to choose its password; otherwise the seed prints a temporary one that must be
+changed on first login.
+
 ## Code map
 
 | Path | What |
@@ -64,10 +75,11 @@ npm run dev                     # http://localhost:3000
 | `src/templates/` | Page geometry, frame, shared parts and the template library |
 | `src/lib/pdf.ts` | Render → preflight → PDF/X pipeline |
 | `src/app/(studio)/` | Studio screens and server actions |
+| `src/lib/auth.ts`, `src/lib/roles.ts` | Sessions, login throttle and the role → permission matrix |
 | `src/app/render/` | Bare page list that Chromium prints (signed URL) |
 
 ## Next up
 
-Phone-OTP login and roles, content inbox with editorial board, members
+Content inbox with editorial board, members
 import, renewal reminders for last year's advertisers, text flowing onto a continuation
 page, Supabase Storage for uploads, printer pack download.

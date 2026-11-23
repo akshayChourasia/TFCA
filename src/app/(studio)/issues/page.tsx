@@ -1,13 +1,15 @@
 import Link from "next/link";
-import { desc, eq, sql } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { getCurrentOrg } from "@/lib/org";
+import { requireUser } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import { createIssue } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function IssuesPage() {
-  const org = await getCurrentOrg();
+  const user = await requireUser();
+  const org = user.org;
   const rows = await db
     .select({
       id: schema.issues.id,
@@ -15,10 +17,12 @@ export default async function IssuesPage() {
       year: schema.issues.year,
       editionLabel: schema.issues.editionLabel,
       status: schema.issues.status,
-      pageCount: sql<number>`(select count(*) from ${schema.pages} where ${schema.pages.issueId} = ${schema.issues.id})`,
+      pageCount: count(schema.pages.id),
     })
     .from(schema.issues)
+    .leftJoin(schema.pages, eq(schema.pages.issueId, schema.issues.id))
     .where(eq(schema.issues.orgId, org.id))
+    .groupBy(schema.issues.id)
     .orderBy(desc(schema.issues.year));
 
   return (
@@ -43,6 +47,7 @@ export default async function IssuesPage() {
         {rows.length === 0 && <li className="px-5 py-4 text-neutral-500">No issues yet.</li>}
       </ul>
 
+      {can(user.role, "issues.manage") && (
       <form action={createIssue} className="mt-8 rounded-lg border bg-white p-5 grid gap-3 sm:grid-cols-4 items-end">
         <label className="sm:col-span-2 text-sm">
           Title
@@ -60,6 +65,7 @@ export default async function IssuesPage() {
           Create issue
         </button>
       </form>
+      )}
     </div>
   );
 }

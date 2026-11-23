@@ -15,6 +15,13 @@
       "when": 1795418047773,
       "tag": "0001_advertiser_crm",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795427822669,
+      "tag": "0002_login",
+      "breakpoints": true
     }
   ]
 }

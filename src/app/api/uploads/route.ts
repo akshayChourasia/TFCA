@@ -3,7 +3,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse, type NextRequest } from "next/server";
 import { db, schema } from "@/db";
-import { getCurrentOrg } from "@/lib/org";
+import { getCurrentUser } from "@/lib/auth";
+import { can } from "@/lib/roles";
 
 export const runtime = "nodejs";
 
@@ -18,7 +19,11 @@ const ALLOWED = new Map([
  * Development storage is public/uploads; production will use Supabase Storage.
  */
 export async function POST(req: NextRequest) {
-  const org = await getCurrentOrg();
+  const user = await getCurrentUser();
+  if (!user || user.mustChangePassword || !(can(user.role, "pages.edit") || can(user.role, "ads.manage"))) {
+    return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+  }
+  const org = user.org;
   const form = await req.formData();
   const file = form.get("file");
   if (!(file instanceof File)) return NextResponse.json({ error: "No file" }, { status: 400 });
