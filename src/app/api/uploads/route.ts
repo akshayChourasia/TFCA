@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db, schema } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@/lib/roles";
+import { uploadDir } from "@/lib/uploads";
 
 export const runtime = "nodejs";
 
@@ -16,7 +17,7 @@ const ALLOWED = new Map([
 
 /**
  * Stores an uploaded image and records it in the media library.
- * Development storage is public/uploads; production will use Supabase Storage.
+ * Files go to UPLOAD_DIR (see src/lib/uploads.ts) and are served at /uploads/....
  */
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
   if (file.size > 40 * 1024 * 1024) return NextResponse.json({ error: "Image is larger than 40 MB" }, { status: 400 });
 
   const name = `${randomUUID()}.${ext}`;
-  const dir = path.join(process.cwd(), "public", "uploads", org.slug);
+  const dir = path.join(uploadDir(), org.slug);
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, name), Buffer.from(await file.arrayBuffer()));
   const url = `/uploads/${org.slug}/${name}`;
