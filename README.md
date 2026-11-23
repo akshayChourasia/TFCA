@@ -19,6 +19,10 @@ belongs to an organisation).
 - **Page editor** – form on the left, live A4 preview on the right, overflow
   warning when text does not fit, image upload, page status
   (draft → proofreading → approved → locked).
+- **Free editing** – unlock any page to drag, resize and layer text, image
+  and shape boxes (mm units, snapping, arrow-key nudge, safe-margin guide),
+  on top of the template's content or on a blank page; reset to the template
+  at any time.
 - **PDF export**
   - *Print*: headless Chromium (correct Devanagari shaping) → Ghostscript
     CMYK PDF/X‑3 with embedded fonts, 3 mm bleed, TrimBox/BleedBox set.
@@ -65,5 +69,5 @@ npm run dev                     # http://localhost:3000
 ## Next up
 
 Phone-OTP login and roles, content inbox with editorial board, members
-import, renewal reminders for last year's advertisers, free-form page mode (drag and drop), text flowing onto a continuation
+import, renewal reminders for last year's advertisers, text flowing onto a continuation
 page, Supabase Storage for uploads, printer pack download.

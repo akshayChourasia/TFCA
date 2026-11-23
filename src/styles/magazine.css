@@ -78,6 +78,7 @@
   color: #1d2b6b; text-align: center; margin: 3mm 2mm; break-inside: avoid;
 }
 .mag-box { position: absolute; overflow: hidden; }
+.mag-box-text { white-space: pre-wrap; line-height: 1.4; width: 100%; height: 100%; }
 
 /* ---- Story / article ---- */
 .tpl-story { display: flex; flex-direction: column; height: 100%; }
