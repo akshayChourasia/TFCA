@@ -29,6 +29,7 @@ export function MagazinePage({
       frame={tpl.frame}
       ctx={fullCtx}
       freeBoxes={page.mode === "free" ? page.boxes ?? [] : null}
+      freeBase={page.data.__freeBase === "blank" ? "blank" : "template"}
     >
       {tpl.render(data, fullCtx)}
     </PageSheet>

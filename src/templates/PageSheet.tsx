@@ -16,6 +16,7 @@ export function PageSheet({
   ctx,
   children,
   freeBoxes,
+  freeBase = "template",
 }: {
   size?: SheetSize;
   showBleed: boolean;
@@ -23,6 +24,8 @@ export function PageSheet({
   ctx: RenderContext;
   children?: ReactNode;
   freeBoxes?: Box[] | null;
+  /** In free mode: keep the template's content under the boxes, or start from a blank page (frame only). */
+  freeBase?: "template" | "blank";
 }) {
   const b = showBleed ? size.bleed : 0;
   const even = ctx.pageNumber % 2 === 0;
@@ -45,7 +48,8 @@ export function PageSheet({
         style={{ left: `${b}mm`, top: `${b}mm`, width: `${size.trimW}mm`, height: `${size.trimH}mm` }}
       >
         {frame === "standard" && <StandardFrame ctx={ctx} even={even} />}
-        {freeBoxes ? <FreeLayer boxes={freeBoxes} /> : children}
+        {!(freeBoxes && freeBase === "blank") && children}
+        {freeBoxes && <FreeLayer boxes={freeBoxes} />}
       </div>
     </div>
   );
@@ -76,31 +80,42 @@ export function FreeLayer({ boxes }: { boxes: Box[] }) {
       {[...boxes]
         .sort((a, b) => (a.z ?? 0) - (b.z ?? 0))
         .map((box) => (
-          <div
-            key={box.id}
-            className="mag-box"
-            style={{
-              left: `${box.x}mm`,
-              top: `${box.y}mm`,
-              width: `${box.w}mm`,
-              height: `${box.h}mm`,
-              transform: box.rotate ? `rotate(${box.rotate}deg)` : undefined,
-              background: box.kind === "shape" ? box.fill ?? "var(--band)" : undefined,
-              color: box.color,
-              fontSize: box.fontSize ? `${box.fontSize}pt` : undefined,
-              textAlign: box.align,
-            }}
-          >
-            {box.kind === "text" && <div className="mag-prose">{box.text}</div>}
-            {box.kind === "image" &&
-              (box.src ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={box.src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                <div className="mag-placeholder">Image</div>
-              ))}
+          <div key={box.id} className="mag-box" style={boxStyle(box)} data-box-id={box.id}>
+            <BoxContent box={box} />
           </div>
         ))}
     </>
   );
+}
+
+export function boxStyle(box: Box): CSSProperties {
+  return {
+    left: `${box.x}mm`,
+    top: `${box.y}mm`,
+    width: `${box.w}mm`,
+    height: `${box.h}mm`,
+    transform: box.rotate ? `rotate(${box.rotate}deg)` : undefined,
+    background: box.kind === "shape" ? box.fill ?? "var(--band)" : undefined,
+    borderRadius: box.radius ? `${box.radius}mm` : undefined,
+    color: box.color,
+    fontSize: box.fontSize ? `${box.fontSize}pt` : undefined,
+    fontFamily: box.font === "heading" ? "var(--font-heading)" : undefined,
+    fontWeight: box.bold ? 800 : undefined,
+    textAlign: box.align,
+    zIndex: 10 + (box.z ?? 0),
+  };
+}
+
+export function BoxContent({ box }: { box: Box }) {
+  if (box.kind === "text") return <div className="mag-box-text">{box.text}</div>;
+  if (box.kind === "image")
+    return box.src ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={box.src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }} />
+    ) : (
+      <div className="mag-placeholder" style={{ width: "100%", height: "100%" }} data-missing-image="Free-mode image">
+        Image
+      </div>
+    );
+  return null;
 }

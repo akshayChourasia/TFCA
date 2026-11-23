@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { savePage } from "@/app/(studio)/actions";
+import { resetToTemplate, saveFreeBoxes, savePage, unlockPage } from "@/app/(studio)/actions";
+import { BoxInspector, FreeCanvas, newBox } from "./FreeEditor";
 import { TEMPLATES, templateByKey } from "@/templates";
 import { MagazinePage } from "@/templates/MagazinePage";
 import type { Box, FieldDef, RenderContext } from "@/templates/types";
@@ -15,7 +16,7 @@ export function PageEditor({
   pageId,
   initial,
   mode,
-  boxes,
+  boxes: boxes0,
   ctx,
 }: {
   pageId: string;
@@ -33,6 +34,15 @@ export function PageEditor({
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const locked = status === "locked";
+  const [freeMode, setFreeMode] = useState(mode === "free");
+  const [boxes, setBoxes] = useState<Box[]>(boxes0 ?? []);
+  const [base, setBase] = useState<"template" | "blank">(initial.data.__freeBase === "blank" ? "blank" : "template");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = boxes.find((b) => b.id === selectedId) ?? null;
+  const setBoxesDirty = (next: Box[]) => {
+    setBoxes(next);
+    setSaved(false);
+  };
 
   const update = (key: string, value: unknown) => {
     setData((d) => ({ ...d, [key]: value }));
@@ -44,6 +54,7 @@ export function PageEditor({
       setError(null);
       try {
         await savePage(pageId, { data, section: section || null, templateKey, status });
+        if (freeMode) await saveFreeBoxes(pageId, boxes, base);
         setSaved(true);
       } catch (e) {
         setError(String(e));
@@ -117,11 +128,124 @@ export function PageEditor({
           </label>
         </div>
 
-        <fieldset disabled={locked} className="rounded-lg border bg-white p-4 space-y-4 text-sm disabled:opacity-60">
-          {tpl.fields.map((f) => (
-            <Field key={f.key} field={f} value={data[f.key]} onChange={(v) => update(f.key, v)} />
-          ))}
-        </fieldset>
+        <div className="rounded-lg border bg-white p-4 space-y-3 text-sm">
+          {!freeMode ? (
+            <>
+              <div className="font-semibold">Free editing</div>
+              <p className="text-neutral-600">Unlock this page to drag, resize and add your own text, images and shapes.</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  disabled={locked || pending}
+                  className="rounded border border-[#1d2b4f] px-3 py-1.5 font-semibold text-[#1d2b4f] disabled:opacity-50"
+                  onClick={() =>
+                    start(async () => {
+                      await savePage(pageId, { data, section: section || null, templateKey, status });
+                      await unlockPage(pageId, "template");
+                      setBase("template");
+                      setFreeMode(true);
+                      setSaved(true);
+                    })
+                  }
+                >
+                  Unlock, keep template content
+                </button>
+                <button
+                  disabled={locked || pending}
+                  className="rounded border px-3 py-1.5 disabled:opacity-50"
+                  onClick={() =>
+                    start(async () => {
+                      await savePage(pageId, { data, section: section || null, templateKey, status });
+                      await unlockPage(pageId, "blank");
+                      setBase("blank");
+                      setFreeMode(true);
+                      setSaved(true);
+                    })
+                  }
+                >
+                  Unlock as blank page
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Free editing</span>
+                <button
+                  disabled={locked || pending}
+                  className="text-rose-700 underline disabled:opacity-50"
+                  onClick={() => {
+                    if (!confirm("Remove all free-mode boxes and go back to the template?")) return;
+                    start(async () => {
+                      await resetToTemplate(pageId);
+                      setFreeMode(false);
+                      setBoxes([]);
+                      setSelectedId(null);
+                      setData((d) => {
+                        const { __freeBase: _b, ...rest } = d;
+                        void _b;
+                        return rest;
+                      });
+                      setSaved(true);
+                    });
+                  }}
+                >
+                  Reset to template
+                </button>
+              </div>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  disabled={locked}
+                  checked={base === "template"}
+                  onChange={(e) => {
+                    setBase(e.target.checked ? "template" : "blank");
+                    setSaved(false);
+                  }}
+                />
+                Show the template&apos;s content under the boxes
+              </label>
+              <div className="flex gap-2">
+                {(["text", "image", "shape"] as const).map((k) => (
+                  <button
+                    key={k}
+                    disabled={locked}
+                    className="rounded bg-[#1d2b4f] px-3 py-1.5 text-white disabled:opacity-50"
+                    onClick={() => {
+                      const b = newBox(k, boxes);
+                      setBoxesDirty([...boxes, b]);
+                      setSelectedId(b.id);
+                    }}
+                  >
+                    + {k === "text" ? "Text" : k === "image" ? "Image" : "Shape"}
+                  </button>
+                ))}
+              </div>
+              {selected && !locked && (
+                <div className="border-t pt-3">
+                  <BoxInspector
+                    box={selected}
+                    onChange={(nb) => setBoxesDirty(boxes.map((b) => (b.id === nb.id ? nb : b)))}
+                    onDelete={() => {
+                      setBoxesDirty(boxes.filter((b) => b.id !== selected.id));
+                      setSelectedId(null);
+                    }}
+                    onLayer={(dir) =>
+                      setBoxesDirty(boxes.map((b) => (b.id === selected.id ? { ...b, z: (b.z ?? 0) + dir } : b)))
+                    }
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {!(freeMode && base === "blank") && (
+          <fieldset disabled={locked} className="rounded-lg border bg-white p-4 space-y-4 text-sm disabled:opacity-60">
+            {tpl.fields.map((f) => (
+              <Field key={f.key} field={f} value={data[f.key]} onChange={(v) => update(f.key, v)} />
+            ))}
+          </fieldset>
+        )}
 
         <div className="sticky bottom-0 flex items-center gap-3 bg-[var(--background)] py-3">
           <button
@@ -135,7 +259,19 @@ export function PageEditor({
         </div>
       </div>
 
-      <Preview page={{ templateKey, section: section || null, mode, data, boxes }} ctx={ctx} />
+      {freeMode ? (
+        <FreeCanvas
+          page={{ templateKey, section: section || null, mode: "free", data: { ...data, __freeBase: base }, boxes }}
+          ctx={ctx}
+          boxes={boxes}
+          onChange={setBoxesDirty}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          disabled={locked}
+        />
+      ) : (
+        <Preview page={{ templateKey, section: section || null, mode: "template", data, boxes: null }} ctx={ctx} />
+      )}
     </div>
   );
 }

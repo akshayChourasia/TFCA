@@ -126,3 +126,60 @@ export async function savePage(pageId: string, input: z.infer<typeof saveSchema>
   revalidatePath(`/issues/${page.issueId}`);
   revalidatePath(`/issues/${page.issueId}/pages/${page.id}`);
 }
+
+// ---------- Free mode ----------
+
+const boxSchema = z.object({
+  id: z.string().min(1).max(64),
+  kind: z.enum(["text", "image", "shape"]),
+  x: z.number().min(-20).max(240),
+  y: z.number().min(-20).max(320),
+  w: z.number().min(1).max(260),
+  h: z.number().min(1).max(340),
+  rotate: z.number().min(-180).max(180).optional(),
+  z: z.number().int().min(-100).max(1000).optional(),
+  text: z.string().max(20000).optional(),
+  fontSize: z.number().min(4).max(200).optional(),
+  font: z.enum(["body", "heading"]).optional(),
+  bold: z.boolean().optional(),
+  color: z.string().max(32).optional(),
+  align: z.enum(["left", "center", "right"]).optional(),
+  src: z.string().max(2000).optional(),
+  fill: z.string().max(32).optional(),
+  radius: z.number().min(0).max(100).optional(),
+});
+
+/** Switches a page to free drag-and-drop editing. */
+export async function unlockPage(pageId: string, base: "template" | "blank") {
+  const { page } = await ownedPage(pageId);
+  if (page.status === "locked") throw new Error("Page is locked.");
+  await db
+    .update(pages)
+    .set({ mode: "free", boxes: page.boxes ?? [], data: { ...page.data, __freeBase: base }, updatedAt: new Date() })
+    .where(eq(pages.id, page.id));
+  revalidatePath(`/issues/${page.issueId}`);
+  revalidatePath(`/issues/${page.issueId}/pages/${page.id}`);
+}
+
+/** Back to the plain template: free-mode boxes are removed. */
+export async function resetToTemplate(pageId: string) {
+  const { page } = await ownedPage(pageId);
+  if (page.status === "locked") throw new Error("Page is locked.");
+  const { __freeBase: _ignored, ...data } = page.data;
+  void _ignored;
+  await db.update(pages).set({ mode: "template", boxes: null, data, updatedAt: new Date() }).where(eq(pages.id, page.id));
+  revalidatePath(`/issues/${page.issueId}`);
+  revalidatePath(`/issues/${page.issueId}/pages/${page.id}`);
+}
+
+export async function saveFreeBoxes(pageId: string, boxes: unknown, base: "template" | "blank") {
+  const { page } = await ownedPage(pageId);
+  if (page.status === "locked") throw new Error("Page is locked.");
+  const parsed = z.array(boxSchema).max(200).parse(boxes);
+  await db
+    .update(pages)
+    .set({ boxes: parsed, data: { ...page.data, __freeBase: base }, updatedAt: new Date() })
+    .where(eq(pages.id, page.id));
+  revalidatePath(`/issues/${page.issueId}`);
+  revalidatePath(`/issues/${page.issueId}/pages/${page.id}`);
+}

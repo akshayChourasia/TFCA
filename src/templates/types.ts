@@ -26,11 +26,16 @@ export type Box = {
   rotate?: number;
   z?: number;
   text?: string;
+  /** pt */
   fontSize?: number;
+  font?: "body" | "heading";
+  bold?: boolean;
   color?: string;
   align?: "left" | "center" | "right";
   src?: string;
   fill?: string;
+  /** mm */
+  radius?: number;
 };
 
 export type DirectoryEntry = { name: string; unit: string | null; phone: string | null };
