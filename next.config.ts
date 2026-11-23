@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // Headless Chromium is launched from the server for PDF export.
+  serverExternalPackages: ["playwright-core"],
   turbopack: {
     rules: {
       "*.css": {
