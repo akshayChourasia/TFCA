@@ -13,7 +13,7 @@ export default async function StudioLayout({ children }: LayoutProps<"/">) {
         <nav className="flex flex-col p-3 gap-1 text-sm">
           <Link className="rounded px-3 py-2 hover:bg-white/10" href="/issues">Issues</Link>
           <span className="rounded px-3 py-2 text-white/40" title="Coming in the next release">Content inbox</span>
-          <span className="rounded px-3 py-2 text-white/40" title="Coming in the next release">Advertisers</span>
+          <Link className="rounded px-3 py-2 hover:bg-white/10" href="/advertisers">Advertisers</Link>
           <span className="rounded px-3 py-2 text-white/40" title="Coming in the next release">Members</span>
         </nav>
       </aside>

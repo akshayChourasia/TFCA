@@ -16,6 +16,17 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import type { BrandKit } from "@/lib/brand";
+
+export type BillingDetails = {
+  address?: string;
+  phone?: string;
+  email?: string;
+  gstin?: string;
+  upiId?: string;
+  bankDetails?: string;
+  /** Invoice numbers look like `${prefix}/${year}/001`. Defaults to the short name. */
+  invoicePrefix?: string;
+};
 import type { Box } from "@/templates/types";
 
 export const roleEnum = pgEnum("role", [
@@ -80,6 +91,8 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   shortName: text("short_name").notNull(),
   brand: jsonb("brand").$type<BrandKit>().notNull(),
+  /** Shown on invoices and receipts. */
+  billing: jsonb("billing").$type<BillingDetails>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -245,6 +258,7 @@ export const invoices = pgTable(
     paidAt: timestamp("paid_at", { withTimezone: true }),
     paymentMethod: text("payment_method"),
     paymentRef: text("payment_ref"),
+    notes: text("notes"),
   },
   (t) => [uniqueIndex("invoices_org_number").on(t.orgId, t.number)],
 );
